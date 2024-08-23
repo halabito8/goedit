@@ -6,13 +6,17 @@ import (
 	"golang.org/x/term"
 )
 
-type sh struct{}
+type rawTerminal struct {
+	width  int
+	height int
+	term   *term.Terminal
+}
 
-func (sh *sh) Read(b []byte) (int, error) {
+func (sh *rawTerminal) Read(b []byte) (int, error) {
 	return os.Stdin.Read(b)
 }
 
-func (sh *sh) Write(b []byte) (int, error) {
+func (sh *rawTerminal) Write(b []byte) (int, error) {
 	return os.Stdout.Write(b[:])
 }
 
@@ -38,15 +42,23 @@ func main() {
 
 	defer term.Restore(int(os.Stdin.Fd()), oldstate)
 
-	terminal := term.NewTerminal(&sh{}, "")
+	terminal := rawTerminal{}
 
-	editorRefreshScreen(terminal)
+	terminal.term = term.NewTerminal(&rawTerminal{}, "")
+
+	terminal.width, terminal.height, err = term.GetSize(int(os.Stdin.Fd()))
+
+	if err != nil {
+		die(terminal.term)
+	}
+
+	editorRefreshScreen(terminal.term)
 
 	var b [1]byte
 	for {
 		os.Stdin.Read(b[:])
 		if b[0] == byte(3) { // Ctrl-C
-			die(terminal)
+			die(terminal.term)
 			break
 		}
 
